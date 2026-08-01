@@ -11,15 +11,19 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    // Meta espera un 200 rapido; respondemos antes de terminar de guardar.
-    res.status(200).send('EVENT_RECEIVED');
+    // Log temporal de diagnostico: guarda el cuerpo crudo de CADA evento que
+    // llega, sin importar el tipo, para poder ver exactamente que envia Meta.
+    console.log('Webhook body:', JSON.stringify(req.body));
 
     try {
       const { kv } = await import('@vercel/kv');
       const entry = req.body?.entry?.[0];
       const value = entry?.changes?.[0]?.value;
+      const field = entry?.changes?.[0]?.field;
       const messages = value?.messages || [];
       const statuses = value?.statuses || [];
+
+      console.log('Campo:', field, '| mensajes:', messages.length, '| estados:', statuses.length);
 
       for (const msg of messages) {
         await kv.rpush('whatsapp:inbox', JSON.stringify({
@@ -49,6 +53,8 @@ export default async function handler(req, res) {
     } catch (err) {
       console.error('Error guardando evento de WhatsApp:', err);
     }
+
+    res.status(200).send('EVENT_RECEIVED');
     return;
   }
 
