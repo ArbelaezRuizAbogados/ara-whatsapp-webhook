@@ -47,6 +47,7 @@ export default async function handler(req, res) {
           recipient_id: st.recipient_id,
           status: st.status,
           timestamp: st.timestamp,
+          errors: st.errors || null,
           received_at: new Date().toISOString(),
         }));
       }
