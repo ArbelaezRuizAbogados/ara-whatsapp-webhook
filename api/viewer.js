@@ -41,6 +41,15 @@ const HTML = `<!DOCTYPE html>
   #toggle-btn { border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12.5px; border: 1px solid #1b2a4a; background: #fff; color: #1b2a4a; }
   #toggle-btn.is-human { border-color: #7a4a00; color: #7a4a00; }
   #empty { flex: 1; display: flex; align-items: center; justify-content: center; color: #999; }
+  #back-btn { display: none; background: none; border: none; font-size: 20px; color: #1b2a4a; cursor: pointer; padding: 0 10px 0 0; }
+  @media (max-width: 700px) {
+    #sidebar { width: 100%; }
+    #main { display: none; }
+    #app.thread-open #sidebar { display: none; }
+    #app.thread-open #main { display: flex; width: 100%; }
+    #back-btn { display: inline-block; }
+    .bubble { max-width: 85%; }
+  }
 </style>
 </head>
 <body>
@@ -58,9 +67,12 @@ const HTML = `<!DOCTYPE html>
   <div id="sidebar"></div>
   <div id="main">
     <div id="thread-header" style="display:none;">
-      <div>
-        <div id="th-name" style="font-weight:600;"></div>
-        <div id="th-num" style="font-size:12px; color:#777;"></div>
+      <div style="display:flex; align-items:center;">
+        <button id="back-btn" aria-label="Volver">&#8592;</button>
+        <div>
+          <div id="th-name" style="font-weight:600;"></div>
+          <div id="th-num" style="font-size:12px; color:#777;"></div>
+        </div>
       </div>
       <button id="toggle-btn"></button>
     </div>
@@ -128,6 +140,7 @@ function renderSidebar(contacts) {
 
 function openThread(number) {
   CURRENT = number;
+  document.getElementById('app').classList.add('thread-open');
   api('/api/threads?number=' + encodeURIComponent(number)).then(function(r) { return r.json(); }).then(function(data) {
     document.getElementById('empty').style.display = 'none';
     document.getElementById('thread-header').style.display = 'flex';
@@ -176,6 +189,11 @@ document.getElementById('release-btn').addEventListener('click', function() {
     method: 'POST',
     body: JSON.stringify({ to: CURRENT, action: 'release' }),
   }).then(function() { openThread(CURRENT); });
+});
+
+document.getElementById('back-btn').addEventListener('click', function() {
+  CURRENT = null;
+  document.getElementById('app').classList.remove('thread-open');
 });
 
 document.getElementById('toggle-btn').addEventListener('click', function() {
