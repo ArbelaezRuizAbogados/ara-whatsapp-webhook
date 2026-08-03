@@ -38,6 +38,8 @@ const HTML = `<!DOCTYPE html>
   #replybar input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
   #takeover-bar { padding: 8px 18px; background: #fdf3e0; font-size: 12.5px; display: none; align-items: center; justify-content: space-between; }
   #takeover-bar button { background: none; border: 1px solid #7a4a00; color: #7a4a00; border-radius: 4px; padding: 4px 10px; cursor: pointer; }
+  #toggle-btn { border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12.5px; border: 1px solid #1b2a4a; background: #fff; color: #1b2a4a; }
+  #toggle-btn.is-human { border-color: #7a4a00; color: #7a4a00; }
   #empty { flex: 1; display: flex; align-items: center; justify-content: center; color: #999; }
 </style>
 </head>
@@ -60,6 +62,7 @@ const HTML = `<!DOCTYPE html>
         <div id="th-name" style="font-weight:600;"></div>
         <div id="th-num" style="font-size:12px; color:#777;"></div>
       </div>
+      <button id="toggle-btn"></button>
     </div>
     <div id="takeover-bar">
       <span>Estas respondiendo tu, el agente no le va a escribir a este contacto.</span>
@@ -77,6 +80,7 @@ const HTML = `<!DOCTYPE html>
 <script>
 let SECRET = '';
 let CURRENT = null;
+let CURRENT_TAKEOVER = false;
 
 document.getElementById('gate-form').addEventListener('submit', function(e) {
   e.preventDefault();
@@ -131,6 +135,10 @@ function openThread(number) {
     document.getElementById('th-name').textContent = number;
     document.getElementById('th-num').textContent = data.takeover ? 'Control humano activo' : 'Respondido por el agente';
     document.getElementById('takeover-bar').style.display = data.takeover ? 'flex' : 'none';
+    CURRENT_TAKEOVER = !!data.takeover;
+    const toggleBtn = document.getElementById('toggle-btn');
+    toggleBtn.textContent = CURRENT_TAKEOVER ? 'Reactivar agente' : 'Pausar agente aqui';
+    toggleBtn.className = CURRENT_TAKEOVER ? 'is-human' : '';
 
     const thread = document.getElementById('thread');
     thread.innerHTML = '';
@@ -167,6 +175,14 @@ document.getElementById('release-btn').addEventListener('click', function() {
   api('/api/takeover', {
     method: 'POST',
     body: JSON.stringify({ to: CURRENT, action: 'release' }),
+  }).then(function() { openThread(CURRENT); });
+});
+
+document.getElementById('toggle-btn').addEventListener('click', function() {
+  if (!CURRENT) return;
+  api('/api/takeover', {
+    method: 'POST',
+    body: JSON.stringify({ to: CURRENT, action: CURRENT_TAKEOVER ? 'release' : 'take' }),
   }).then(function() { openThread(CURRENT); });
 });
 
