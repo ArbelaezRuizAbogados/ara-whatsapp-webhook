@@ -8,13 +8,14 @@ export default async function handler(req, res) {
     return res.status(401).send('Unauthorized');
   }
 
-  const { to, message, template, language, components } = req.body || {};
+  const { to, message, template, language, components, sender } = req.body || {};
   if (!to || (!message && !template)) {
     return res.status(400).json({ error: 'Falta "to" y uno de "message" o "template".' });
   }
 
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const who = sender === 'human' ? 'human' : 'agent';
 
   const payload = template
     ? {
@@ -48,6 +49,24 @@ export default async function handler(req, res) {
     if (!metaRes.ok) {
       console.error('Error de Meta al enviar:', JSON.stringify(data));
       return res.status(metaRes.status).json({ error: data });
+    }
+
+    try {
+      const { kv } = await import('@vercel/kv');
+      await kv.rpush(`whatsapp:thread:${to}`, JSON.stringify({
+        direction: 'out',
+        sender: who,
+        text: message || `[plantilla: ${template}]`,
+        timestamp: String(Math.floor(Date.now() / 1000)),
+        received_at: new Date().toISOString(),
+      }));
+      await kv.zadd('whatsapp:contacts', { score: Math.floor(Date.now() / 1000), member: to });
+
+      if (who === 'human') {
+        await kv.set(`whatsapp:takeover:${to}`, '1');
+      }
+    } catch (logErr) {
+      console.error('Error guardando en historial:', logErr);
     }
 
     return res.status(200).json({ success: true, result: data });

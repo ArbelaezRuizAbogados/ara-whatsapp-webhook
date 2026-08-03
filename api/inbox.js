@@ -14,7 +14,17 @@ export default async function handler(req, res) {
   while (true) {
     const item = await kv.lpop('whatsapp:inbox');
     if (!item) break;
-    messages.push(typeof item === 'string' ? JSON.parse(item) : item);
+    const parsed = typeof item === 'string' ? JSON.parse(item) : item;
+
+    // Si el contacto esta bajo control humano, no se le entrega al agente -
+    // ya quedo guardado en el historial (whatsapp:thread) para el visor.
+    const contact = parsed.from || parsed.recipient_id;
+    if (contact) {
+      const takenOver = await kv.get(`whatsapp:takeover:${contact}`);
+      if (takenOver) continue;
+    }
+
+    messages.push(parsed);
   }
 
   res.status(200).json({ messages });

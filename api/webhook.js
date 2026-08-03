@@ -38,6 +38,17 @@ export default async function handler(req, res) {
           raw: msg,
           received_at: new Date().toISOString(),
         }));
+
+        // Historial permanente para el visor (no se borra al consumir /api/inbox).
+        await kv.rpush(`whatsapp:thread:${msg.from}`, JSON.stringify({
+          direction: 'in',
+          sender: 'customer',
+          text: msg.text?.body || `[${msg.type}]`,
+          button: msg.button?.text || msg.interactive?.button_reply?.title || null,
+          timestamp: msg.timestamp,
+          received_at: new Date().toISOString(),
+        }));
+        await kv.zadd('whatsapp:contacts', { score: Number(msg.timestamp), member: msg.from });
       }
 
       for (const st of statuses) {
