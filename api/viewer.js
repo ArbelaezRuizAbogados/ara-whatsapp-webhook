@@ -40,6 +40,7 @@ const HTML = `<!DOCTYPE html>
   #takeover-bar button { background: none; border: 1px solid #7a4a00; color: #7a4a00; border-radius: 4px; padding: 4px 10px; cursor: pointer; }
   #toggle-btn { border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12.5px; border: 1px solid #1b2a4a; background: #fff; color: #1b2a4a; }
   #toggle-btn.is-human { border-color: #7a4a00; color: #7a4a00; }
+  #delete-btn { border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12.5px; border: 1px solid #a32d2d; background: #fff; color: #a32d2d; }
   #empty { flex: 1; display: flex; align-items: center; justify-content: center; color: #999; }
   #back-btn { display: none; }
   @media (max-width: 700px) {
@@ -77,7 +78,10 @@ const HTML = `<!DOCTYPE html>
         <div id="th-name" style="font-weight:600;"></div>
         <div id="th-num" style="font-size:12px; color:#777;"></div>
       </div>
-      <button id="toggle-btn"></button>
+      <div style="display:flex; gap:6px;">
+        <button id="toggle-btn"></button>
+        <button id="delete-btn" title="Eliminar conversacion">Eliminar</button>
+      </div>
     </div>
     <div id="takeover-bar">
       <span>Estas respondiendo tu, el agente no le va a escribir a este contacto.</span>
@@ -191,6 +195,23 @@ document.getElementById('release-btn').addEventListener('click', function() {
     method: 'POST',
     body: JSON.stringify({ to: CURRENT, action: 'release' }),
   }).then(function() { openThread(CURRENT); });
+});
+
+document.getElementById('delete-btn').addEventListener('click', function() {
+  if (!CURRENT) return;
+  if (!confirm('Eliminar esta conversacion del visor? No se puede deshacer.')) return;
+  api('/api/delete-thread', {
+    method: 'POST',
+    body: JSON.stringify({ to: CURRENT }),
+  }).then(function() {
+    CURRENT = null;
+    document.getElementById('thread-header').style.display = 'none';
+    document.getElementById('replybar').style.display = 'none';
+    document.getElementById('takeover-bar').style.display = 'none';
+    document.getElementById('thread').innerHTML = '';
+    document.getElementById('empty').style.display = 'flex';
+    loadContacts();
+  });
 });
 
 document.getElementById('toggle-btn').addEventListener('click', function() {
