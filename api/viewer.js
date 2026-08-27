@@ -207,7 +207,10 @@ function escapeHtml(s) {
   return d.innerHTML;
 }
 
-setInterval(function() { if (SECRET) loadContacts(); }, 15000);
+setInterval(function() {
+  if (!SECRET) return;
+  if (CURRENT) { openThread(CURRENT); } else { loadContacts(); }
+}, 15000);
 </script>
 </body>
 </html>`;
