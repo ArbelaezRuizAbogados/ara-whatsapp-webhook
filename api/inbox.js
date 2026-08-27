@@ -9,11 +9,15 @@ export default async function handler(req, res) {
   }
 
   const { kv } = await import('@vercel/kv');
+  // Lectura NO destructiva: los mensajes se quedan en la cola hasta que el
+  // agente confirme haberlos procesado con POST /api/ack. Si el agente se
+  // cuelga o falla antes de confirmar, el siguiente ciclo los vuelve a ver -
+  // nunca se pierden en silencio. (El historial permanente en whatsapp:thread
+  // nunca se borra, sin importar lo que pase aqui.)
+  const raw = await kv.lrange('whatsapp:inbox', 0, -1);
   const messages = [];
-  // Drena la cola completa: cada mensaje se entrega una sola vez.
-  while (true) {
-    const item = await kv.lpop('whatsapp:inbox');
-    if (!item) break;
+
+  for (const item of raw) {
     const parsed = typeof item === 'string' ? JSON.parse(item) : item;
 
     // Si el contacto esta bajo control humano, no se le entrega al agente -
@@ -27,5 +31,5 @@ export default async function handler(req, res) {
     messages.push(parsed);
   }
 
-  res.status(200).json({ messages });
+  res.status(200).json({ messages, count: raw.length });
 }
