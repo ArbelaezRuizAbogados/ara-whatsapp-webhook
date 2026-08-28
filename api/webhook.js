@@ -39,12 +39,20 @@ export default async function handler(req, res) {
           received_at: new Date().toISOString(),
         }));
 
+        // Media (audio, imagen, video, documento): Meta solo manda un ID de
+        // referencia, no el archivo - queda guardado para descargarlo despues
+        // via /api/media cuando el visor lo pida.
+        const media = msg.audio || msg.image || msg.video || msg.document || msg.voice || null;
+
         // Historial permanente para el visor (no se borra al consumir /api/inbox).
         await kv.rpush(`whatsapp:thread:${msg.from}`, JSON.stringify({
           direction: 'in',
           sender: 'customer',
           text: msg.text?.body || `[${msg.type}]`,
           button: msg.button?.text || msg.interactive?.button_reply?.title || null,
+          media_id: media?.id || null,
+          media_mime_type: media?.mime_type || null,
+          media_type: media ? msg.type : null,
           timestamp: msg.timestamp,
           received_at: new Date().toISOString(),
         }));

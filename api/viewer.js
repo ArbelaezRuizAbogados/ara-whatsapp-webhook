@@ -177,7 +177,8 @@ function openThread(number) {
       const b = document.createElement('div');
       b.className = 'bubble ' + (m.direction === 'out' ? 'out' : 'in') + (m.sender === 'human' ? ' human' : '');
       const time = new Date(Number(m.timestamp) * 1000).toLocaleString('es-CO');
-      b.innerHTML = escapeHtml(m.text) + '<div class="meta">' + (m.direction === 'out' ? (m.sender === 'human' ? 'Tu' : 'Agente') + ' - ' : '') + time + '</div>';
+      const mediaHtml = renderMedia(m);
+      b.innerHTML = mediaHtml + escapeHtml(m.text) + '<div class="meta">' + (m.direction === 'out' ? (m.sender === 'human' ? 'Tu' : 'Agente') + ' - ' : '') + time + '</div>';
       thread.appendChild(b);
     });
     thread.scrollTop = thread.scrollHeight;
@@ -241,6 +242,21 @@ document.getElementById('toggle-btn').addEventListener('click', function() {
     body: JSON.stringify({ to: CURRENT, action: CURRENT_TAKEOVER ? 'release' : 'take' }),
   }).then(function() { openThread(CURRENT); });
 });
+
+function renderMedia(m) {
+  if (!m.media_id) return '';
+  const src = '/api/media?id=' + encodeURIComponent(m.media_id) + '&secret=' + encodeURIComponent(SECRET);
+  if (m.media_type === 'audio' || m.media_type === 'voice') {
+    return '<audio controls style="max-width:100%; display:block; margin-bottom:4px;" src="' + src + '"></audio>';
+  }
+  if (m.media_type === 'image') {
+    return '<img src="' + src + '" style="max-width:100%; border-radius:8px; display:block; margin-bottom:4px;" />';
+  }
+  if (m.media_type === 'video') {
+    return '<video controls style="max-width:100%; display:block; margin-bottom:4px;" src="' + src + '"></video>';
+  }
+  return '<a href="' + src + '" target="_blank" style="display:block; margin-bottom:4px;">Descargar archivo adjunto</a>';
+}
 
 function escapeHtml(s) {
   const d = document.createElement('div');
