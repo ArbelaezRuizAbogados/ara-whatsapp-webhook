@@ -1,3 +1,41 @@
+async function transcribeAudio(mediaId) {
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) return null;
+
+  const metaRes = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const metaData = await metaRes.json();
+  if (!metaRes.ok || !metaData.url) {
+    console.error('No se pudo obtener URL de audio:', JSON.stringify(metaData));
+    return null;
+  }
+
+  const fileRes = await fetch(metaData.url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!fileRes.ok) return null;
+  const arrayBuffer = await fileRes.arrayBuffer();
+
+  const form = new FormData();
+  form.append('file', new Blob([arrayBuffer], { type: metaData.mime_type || 'audio/ogg' }), 'audio.ogg');
+  form.append('model', 'whisper-1');
+  form.append('language', 'es');
+
+  const whisperRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${openaiKey}` },
+    body: form,
+  });
+  const whisperData = await whisperRes.json();
+  if (!whisperRes.ok) {
+    console.error('Error de Whisper:', JSON.stringify(whisperData));
+    return null;
+  }
+  return whisperData.text || null;
+}
+
 export default async function handler(req, res) {
   if (req.method === 'GET') {
     const mode = req.query['hub.mode'];
@@ -26,29 +64,42 @@ export default async function handler(req, res) {
       console.log('Campo:', field, '| mensajes:', messages.length, '| estados:', statuses.length);
 
       for (const msg of messages) {
+        // Media (audio, imagen, video, documento): Meta solo manda un ID de
+        // referencia, no el archivo - queda guardado para descargarlo despues
+        // via /api/media cuando el visor lo pida.
+        const media = msg.audio || msg.image || msg.video || msg.document || msg.voice || null;
+
+        let transcribedText = null;
+        if (media && (msg.type === 'audio' || msg.type === 'voice')) {
+          try {
+            transcribedText = await transcribeAudio(media.id);
+          } catch (err) {
+            console.error('Error transcribiendo audio:', err);
+          }
+        }
+
+        const messageText = msg.text?.body || transcribedText;
+
         await kv.rpush('whatsapp:inbox', JSON.stringify({
           kind: 'message',
           id: msg.id,
           from: msg.from,
           timestamp: msg.timestamp,
           type: msg.type,
-          text: msg.text?.body || null,
+          text: messageText || null,
+          transcribed: !!transcribedText,
           button: msg.button || null,
           interactive: msg.interactive || null,
           raw: msg,
           received_at: new Date().toISOString(),
         }));
 
-        // Media (audio, imagen, video, documento): Meta solo manda un ID de
-        // referencia, no el archivo - queda guardado para descargarlo despues
-        // via /api/media cuando el visor lo pida.
-        const media = msg.audio || msg.image || msg.video || msg.document || msg.voice || null;
-
         // Historial permanente para el visor (no se borra al consumir /api/inbox).
         await kv.rpush(`whatsapp:thread:${msg.from}`, JSON.stringify({
           direction: 'in',
           sender: 'customer',
-          text: msg.text?.body || `[${msg.type}]`,
+          text: messageText || `[${msg.type}]`,
+          transcribed: !!transcribedText,
           button: msg.button?.text || msg.interactive?.button_reply?.title || null,
           media_id: media?.id || null,
           media_mime_type: media?.mime_type || null,

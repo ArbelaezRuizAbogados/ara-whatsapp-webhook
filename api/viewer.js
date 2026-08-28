@@ -178,7 +178,8 @@ function openThread(number) {
       b.className = 'bubble ' + (m.direction === 'out' ? 'out' : 'in') + (m.sender === 'human' ? ' human' : '');
       const time = new Date(Number(m.timestamp) * 1000).toLocaleString('es-CO');
       const mediaHtml = renderMedia(m);
-      b.innerHTML = mediaHtml + escapeHtml(m.text) + '<div class="meta">' + (m.direction === 'out' ? (m.sender === 'human' ? 'Tu' : 'Agente') + ' - ' : '') + time + '</div>';
+      const transcribedTag = m.transcribed ? '<div style="font-size:10.5px; opacity:0.7; margin-bottom:2px;">🎤 Transcripcion automatica</div>' : '';
+      b.innerHTML = mediaHtml + transcribedTag + escapeHtml(m.text) + '<div class="meta">' + (m.direction === 'out' ? (m.sender === 'human' ? 'Tu' : 'Agente') + ' - ' : '') + time + '</div>';
       thread.appendChild(b);
     });
     thread.scrollTop = thread.scrollHeight;
