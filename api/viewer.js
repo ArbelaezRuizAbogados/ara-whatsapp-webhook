@@ -16,7 +16,18 @@ const HTML = `<!DOCTYPE html>
   #gate form { background: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.15); width: 280px; }
   #gate input { width: 100%; padding: 10px; margin: 12px 0; border: 1px solid #ccc; border-radius: 4px; }
   #gate button, .send-btn { background: #1b2a4a; color: #fff; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; width: 100%; }
-  #app { display: none; height: 100vh; }
+  #app { display: none; height: 100vh; flex-direction: column; }
+  #top-bar { background: #1b2a4a; color: #fff; padding: 8px 14px; display: flex; justify-content: flex-end; flex-shrink: 0; }
+  #queue-btn { background: none; border: 1px solid rgba(255,255,255,0.5); color: #fff; border-radius: 4px; padding: 5px 10px; cursor: pointer; font-size: 12px; }
+  #main-row { flex: 1; display: flex; min-height: 0; }
+  #queue-panel { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 10; align-items: center; justify-content: center; }
+  #queue-box { background: #fff; border-radius: 8px; width: 480px; max-width: 92vw; max-height: 80vh; display: flex; flex-direction: column; }
+  #queue-head { padding: 12px 16px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
+  #queue-list { overflow-y: auto; padding: 8px; }
+  .queue-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 8px 10px; border-bottom: 1px solid #f0f0f0; font-size: 12.5px; }
+  .queue-item .qtext { flex: 1; }
+  .queue-item .qfrom { font-weight: 600; }
+  .queue-item button { background: none; border: 1px solid #a32d2d; color: #a32d2d; border-radius: 4px; padding: 3px 8px; cursor: pointer; font-size: 11px; flex-shrink: 0; }
   #sidebar { width: 300px; background: #fff; border-right: 1px solid #ddd; overflow-y: auto; flex-shrink: 0; }
   .contact { padding: 12px 14px; border-bottom: 1px solid #eee; cursor: pointer; }
   .contact:hover { background: #f7f6f2; }
@@ -74,6 +85,19 @@ const HTML = `<!DOCTYPE html>
 </div>
 
 <div id="app" style="display:none;">
+  <div id="top-bar">
+    <button id="queue-btn">Cola pendiente (0)</button>
+  </div>
+  <div id="queue-panel">
+    <div id="queue-box">
+      <div id="queue-head">
+        <span>Cola pendiente</span>
+        <button id="queue-close" style="background:none; border:none; font-size:18px; cursor:pointer;">&times;</button>
+      </div>
+      <div id="queue-list"></div>
+    </div>
+  </div>
+  <div id="main-row">
   <div id="sidebar"></div>
   <div id="main">
     <div id="thread-header" style="display:none;">
@@ -98,6 +122,7 @@ const HTML = `<!DOCTYPE html>
       <button class="send-btn" id="reply-send" style="width:auto;">Enviar</button>
     </div>
   </div>
+  </div>
 </div>
 
 <script>
@@ -113,6 +138,7 @@ document.getElementById('gate-form').addEventListener('submit', function(e) {
     if (ok) {
       document.getElementById('gate').style.display = 'none';
       document.getElementById('app').style.display = 'flex';
+      loadQueue();
     } else {
       document.getElementById('gate-error').textContent = 'Clave incorrecta';
     }
@@ -134,6 +160,41 @@ function loadContacts() {
     });
   }).catch(function() { return false; });
 }
+
+function loadQueue() {
+  return api('/api/queue').then(function(r) { return r.json(); }).then(function(data) {
+    const items = data.items || [];
+    document.getElementById('queue-btn').textContent = 'Cola pendiente (' + items.length + ')';
+    const list = document.getElementById('queue-list');
+    list.innerHTML = '';
+    if (!items.length) {
+      list.innerHTML = '<div style="padding:16px; color:#999; font-size:13px;">No hay nada pendiente.</div>';
+      return;
+    }
+    items.forEach(function(it) {
+      const row = document.createElement('div');
+      row.className = 'queue-item';
+      const who = it.from || it.recipient_id || '';
+      const label = it.kind === 'status'
+        ? ('estado: ' + it.status + (it.errors ? ' (' + it.errors[0].title + ')' : ''))
+        : (it.text || it.button || ('[' + it.type + ']'));
+      row.innerHTML = '<div class="qtext"><div class="qfrom">' + escapeHtml(String(who)) + '</div>' + escapeHtml(String(label)) + '</div>' +
+        '<button data-idx="' + it.index + '">Quitar</button>';
+      row.querySelector('button').addEventListener('click', function() {
+        api('/api/queue', { method: 'POST', body: JSON.stringify({ index: it.index }) }).then(loadQueue);
+      });
+      list.appendChild(row);
+    });
+  });
+}
+
+document.getElementById('queue-btn').addEventListener('click', function() {
+  document.getElementById('queue-panel').style.display = 'flex';
+  loadQueue();
+});
+document.getElementById('queue-close').addEventListener('click', function() {
+  document.getElementById('queue-panel').style.display = 'none';
+});
 
 function renderSidebar(contacts) {
   const el = document.getElementById('sidebar');
@@ -268,6 +329,7 @@ function escapeHtml(s) {
 setInterval(function() {
   if (!SECRET) return;
   if (CURRENT) { openThread(CURRENT); } else { loadContacts(); }
+  loadQueue();
 }, 15000);
 </script>
 </body>
