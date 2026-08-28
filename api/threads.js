@@ -16,7 +16,8 @@ export default async function handler(req, res) {
     const raw = await kv.lrange(`whatsapp:thread:${single}`, 0, -1);
     const messages = raw.map((m) => (typeof m === 'string' ? JSON.parse(m) : m));
     const takeover = !!(await kv.get(`whatsapp:takeover:${single}`));
-    return res.status(200).json({ number: single, takeover, messages });
+    const blocked = !!(await kv.get(`whatsapp:blocked:${single}`));
+    return res.status(200).json({ number: single, takeover, blocked, messages });
   }
 
   const list = [];
@@ -24,7 +25,8 @@ export default async function handler(req, res) {
     const raw = await kv.lrange(`whatsapp:thread:${number}`, -1, -1);
     const last = raw[0] ? (typeof raw[0] === 'string' ? JSON.parse(raw[0]) : raw[0]) : null;
     const takeover = !!(await kv.get(`whatsapp:takeover:${number}`));
-    list.push({ number, last, takeover });
+    const blocked = !!(await kv.get(`whatsapp:blocked:${number}`));
+    list.push({ number, last, takeover, blocked });
   }
 
   res.status(200).json({ contacts: list });

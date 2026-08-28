@@ -20,12 +20,15 @@ export default async function handler(req, res) {
   for (const item of raw) {
     const parsed = typeof item === 'string' ? JSON.parse(item) : item;
 
-    // Si el contacto esta bajo control humano, no se le entrega al agente -
-    // ya quedo guardado en el historial (whatsapp:thread) para el visor.
+    // Si el contacto esta bajo control humano o bloqueado, no se le entrega
+    // al agente - ya quedo guardado en el historial (whatsapp:thread) para
+    // el visor, pero nadie le responde automaticamente.
     const contact = parsed.from || parsed.recipient_id;
     if (contact) {
       const takenOver = await kv.get(`whatsapp:takeover:${contact}`);
       if (takenOver) continue;
+      const blocked = await kv.get(`whatsapp:blocked:${contact}`);
+      if (blocked) continue;
     }
 
     messages.push(parsed);

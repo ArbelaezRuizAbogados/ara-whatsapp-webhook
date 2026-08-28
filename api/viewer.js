@@ -41,6 +41,9 @@ const HTML = `<!DOCTYPE html>
   #toggle-btn { border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12.5px; border: 1px solid #1b2a4a; background: #fff; color: #1b2a4a; }
   #toggle-btn.is-human { border-color: #7a4a00; color: #7a4a00; }
   #delete-btn { border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12.5px; border: 1px solid #a32d2d; background: #fff; color: #a32d2d; }
+  #block-btn { border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12.5px; border: 1px solid #888; background: #fff; color: #555; }
+  #block-btn.is-blocked { border-color: #a32d2d; color: #a32d2d; background: #fcebeb; }
+  .badge.blocked { background: #f7c1c1; color: #791f1f; }
   #empty { flex: 1; display: flex; align-items: center; justify-content: center; color: #999; }
   #back-btn { display: none; }
   @media (max-width: 700px) {
@@ -80,6 +83,7 @@ const HTML = `<!DOCTYPE html>
       </div>
       <div style="display:flex; gap:6px;">
         <button id="toggle-btn"></button>
+        <button id="block-btn"></button>
         <button id="delete-btn" title="Eliminar conversacion">Eliminar</button>
       </div>
     </div>
@@ -100,6 +104,7 @@ const HTML = `<!DOCTYPE html>
 let SECRET = '';
 let CURRENT = null;
 let CURRENT_TAKEOVER = false;
+let CURRENT_BLOCKED = false;
 
 document.getElementById('gate-form').addEventListener('submit', function(e) {
   e.preventDefault();
@@ -137,9 +142,11 @@ function renderSidebar(contacts) {
     const div = document.createElement('div');
     div.className = 'contact' + (CURRENT === c.number ? ' active' : '');
     const preview = c.last ? c.last.text : '';
+    const badgeClass = c.blocked ? 'blocked' : (c.takeover ? 'human' : 'auto');
+    const badgeText = c.blocked ? 'Bloqueado' : (c.takeover ? 'Control humano' : 'Agente activo');
     div.innerHTML = '<div class="num">' + c.number + '</div>' +
       '<div class="prev">' + escapeHtml(preview) + '</div>' +
-      '<span class="badge ' + (c.takeover ? 'human' : 'auto') + '">' + (c.takeover ? 'Control humano' : 'Agente activo') + '</span>';
+      '<span class="badge ' + badgeClass + '">' + badgeText + '</span>';
     div.addEventListener('click', function() { openThread(c.number); });
     el.appendChild(div);
   });
@@ -158,6 +165,11 @@ function openThread(number) {
     const toggleBtn = document.getElementById('toggle-btn');
     toggleBtn.textContent = CURRENT_TAKEOVER ? 'Reactivar agente' : 'Pausar agente aqui';
     toggleBtn.className = CURRENT_TAKEOVER ? 'is-human' : '';
+
+    CURRENT_BLOCKED = !!data.blocked;
+    const blockBtn = document.getElementById('block-btn');
+    blockBtn.textContent = CURRENT_BLOCKED ? 'Desbloquear' : 'Bloquear';
+    blockBtn.className = CURRENT_BLOCKED ? 'is-blocked' : '';
 
     const thread = document.getElementById('thread');
     thread.innerHTML = '';
@@ -194,6 +206,14 @@ document.getElementById('release-btn').addEventListener('click', function() {
   api('/api/takeover', {
     method: 'POST',
     body: JSON.stringify({ to: CURRENT, action: 'release' }),
+  }).then(function() { openThread(CURRENT); });
+});
+
+document.getElementById('block-btn').addEventListener('click', function() {
+  if (!CURRENT) return;
+  api('/api/block', {
+    method: 'POST',
+    body: JSON.stringify({ to: CURRENT, action: CURRENT_BLOCKED ? 'unblock' : 'block' }),
   }).then(function() { openThread(CURRENT); });
 });
 
