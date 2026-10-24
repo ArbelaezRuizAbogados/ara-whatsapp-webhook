@@ -40,7 +40,10 @@ const HTML = `<!DOCTYPE html>
   #main { flex: 1; display: flex; flex-direction: column; }
   #thread-header { padding: 14px 18px; background: #fff; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
   #thread { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
-  .bubble { max-width: 65%; padding: 8px 12px; border-radius: 10px; font-size: 14px; line-height: 1.4; }
+  .bubble { max-width: 65%; padding: 8px 12px; border-radius: 10px; font-size: 14px; line-height: 1.4; white-space: pre-wrap; }
+  .qbtns { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; white-space: normal; }
+  .qbtn { text-align: center; font-size: 12.5px; padding: 5px 10px; border-radius: 14px; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35); }
+  .qbtn.reply { display: inline-block; background: #eef1f8; border: 1px solid #c9d2e6; color: #1b2a4a; }
   .bubble.in { align-self: flex-start; background: #fff; border: 1px solid #e0e0e0; }
   .bubble.out { align-self: flex-end; background: #1b2a4a; color: #fff; }
   .bubble.out.human { background: #c9a227; }
@@ -130,6 +133,7 @@ let SECRET = '';
 let CURRENT = null;
 let CURRENT_TAKEOVER = false;
 let CURRENT_BLOCKED = false;
+let TEMPLATES = {};
 
 document.getElementById('gate-form').addEventListener('submit', function(e) {
   e.preventDefault();
@@ -139,6 +143,7 @@ document.getElementById('gate-form').addEventListener('submit', function(e) {
       document.getElementById('gate').style.display = 'none';
       document.getElementById('app').style.display = 'flex';
       loadQueue();
+      loadTemplates();
     } else {
       document.getElementById('gate-error').textContent = 'Clave incorrecta';
     }
@@ -202,7 +207,7 @@ function renderSidebar(contacts) {
   contacts.forEach(function(c) {
     const div = document.createElement('div');
     div.className = 'contact' + (CURRENT === c.number ? ' active' : '');
-    const preview = c.last ? c.last.text : '';
+    const preview = previewText(c.last);
     const badgeClass = c.blocked ? 'blocked' : (c.takeover ? 'human' : 'auto');
     const badgeText = c.blocked ? 'Bloqueado' : (c.takeover ? 'Control humano' : 'Agente activo');
     div.innerHTML = '<div class="num">' + c.number + '</div>' +
@@ -240,7 +245,7 @@ function openThread(number) {
       const time = new Date(Number(m.timestamp) * 1000).toLocaleString('es-CO');
       const mediaHtml = renderMedia(m);
       const transcribedTag = m.transcribed ? '<div style="font-size:10.5px; opacity:0.7; margin-bottom:2px;">🎤 Transcripcion automatica</div>' : '';
-      b.innerHTML = mediaHtml + transcribedTag + escapeHtml(m.text) + '<div class="meta">' + (m.direction === 'out' ? (m.sender === 'human' ? 'Tu' : 'Agente') + ' - ' : '') + time + '</div>';
+      b.innerHTML = mediaHtml + transcribedTag + renderBody(m) + '<div class="meta">' + (m.direction === 'out' ? (m.sender === 'human' ? 'Tu' : 'Agente') + ' - ' : '') + time + '</div>';
       thread.appendChild(b);
     });
     thread.scrollTop = thread.scrollHeight;
@@ -304,6 +309,49 @@ document.getElementById('toggle-btn').addEventListener('click', function() {
     body: JSON.stringify({ to: CURRENT, action: CURRENT_TAKEOVER ? 'release' : 'take' }),
   }).then(function() { openThread(CURRENT); });
 });
+
+// Muestra el contenido tal como lo ve el cliente en WhatsApp, en vez de los
+// marcadores internos: "[plantilla: nombre]" -> texto y botones reales de la
+// plantilla; "[button]" -> el boton que pulso el cliente; "[image]" etc. ->
+// nada extra cuando ya se muestra el archivo.
+function renderBody(m) {
+  var t = m.text || '';
+  if (t.indexOf('[plantilla: ') === 0 && t.charAt(t.length - 1) === ']') {
+    var name = t.slice(12, -1);
+    var tpl = TEMPLATES[name];
+    if (tpl && tpl.text) {
+      var btns = (tpl.buttons || []).map(function(x) {
+        return '<div class="qbtn">' + escapeHtml(x) + '</div>';
+      }).join('');
+      return escapeHtml(tpl.text) + (btns ? '<div class="qbtns">' + btns + '</div>' : '');
+    }
+    return escapeHtml('Plantilla: ' + name);
+  }
+  if (m.button && t.charAt(0) === '[') {
+    return '<span class="qbtn reply">&#8617; ' + escapeHtml(m.button) + '</span>';
+  }
+  if (m.media_id && ['[image]', '[audio]', '[video]', '[document]', '[voice]'].indexOf(t) >= 0) {
+    return '';
+  }
+  return escapeHtml(t);
+}
+
+function previewText(m) {
+  if (!m) return '';
+  var t = m.text || '';
+  if (t.indexOf('[plantilla: ') === 0) {
+    var tpl = TEMPLATES[t.slice(12, -1)];
+    return tpl && tpl.text ? tpl.text.split(String.fromCharCode(10)).join(' ') : 'Plantilla enviada';
+  }
+  if (m.button && t.charAt(0) === '[') return m.button;
+  return t;
+}
+
+function loadTemplates() {
+  return api('/api/templates').then(function(r) { return r.ok ? r.json() : {}; })
+    .then(function(d) { TEMPLATES = d || {}; })
+    .catch(function() {});
+}
 
 function renderMedia(m) {
   if (!m.media_id) return '';
