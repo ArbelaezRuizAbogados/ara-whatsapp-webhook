@@ -348,7 +348,7 @@ function previewText(m) {
 }
 
 function loadTemplates() {
-  return api('/api/templates').then(function(r) { return r.ok ? r.json() : {}; })
+  return api('/api/threads?templates=1').then(function(r) { return r.ok ? r.json() : {}; })
     .then(function(d) { TEMPLATES = d || {}; })
     .catch(function() {});
 }
