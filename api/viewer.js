@@ -31,6 +31,8 @@ const HTML = `<!DOCTYPE html>
   #sidebar { width: 300px; background: #fff; border-right: 1px solid #ddd; overflow-y: auto; flex-shrink: 0; }
   .contact { padding: 12px 14px; border-bottom: 1px solid #eee; cursor: pointer; }
   .contact:hover { background: #f7f6f2; }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; float: left; margin-right: 10px; }
+  @media (max-width: 700px) { .avatar { float: none; margin: 0 auto 4px; } }
   .contact.active { background: #eef1f8; }
   .contact .num { font-weight: 600; font-size: 13.5px; }
   .contact .prev { font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
@@ -213,7 +215,10 @@ function renderSidebar(contacts) {
     const preview = previewText(c.last);
     const badgeClass = c.blocked ? 'blocked' : (c.takeover ? 'human' : 'auto');
     const badgeText = c.blocked ? 'Bloqueado' : (c.takeover ? 'Control humano' : 'Agente activo');
-    div.innerHTML = '<div class="num">' + (c.name ? escapeHtml(c.name) : c.number) + '</div>' +
+    const ini = c.name ? c.name.trim().split(' ').slice(0, 2).map(function(w) { return w.charAt(0); }).join('').toUpperCase() : '#';
+    const hue = parseInt(String(c.number).slice(-4), 10) % 360;
+    div.innerHTML = '<div class="avatar" style="background:hsl(' + hue + ',45%,45%)">' + escapeHtml(ini) + '</div>' +
+      '<div class="num">' + (c.name ? escapeHtml(c.name) : c.number) + '</div>' +
       (c.name ? '<div class="prev" style="font-size:11px;">' + c.number + '</div>' : '') +
       '<div class="prev">' + escapeHtml(preview) + '</div>' +
       '<span class="badge ' + badgeClass + '">' + badgeText + '</span>';
