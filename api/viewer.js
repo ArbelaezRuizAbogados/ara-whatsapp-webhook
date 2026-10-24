@@ -55,6 +55,7 @@ const HTML = `<!DOCTYPE html>
   #toggle-btn { border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12.5px; border: 1px solid #1b2a4a; background: #fff; color: #1b2a4a; }
   #toggle-btn.is-human { border-color: #7a4a00; color: #7a4a00; }
   #delete-btn { border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12.5px; border: 1px solid #a32d2d; background: #fff; color: #a32d2d; }
+  #save-btn { border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12.5px; border: 1px solid #1e6b2e; background: #fff; color: #1e6b2e; }
   #block-btn { border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12.5px; border: 1px solid #888; background: #fff; color: #555; }
   #block-btn.is-blocked { border-color: #a32d2d; color: #a32d2d; background: #fcebeb; }
   .badge.blocked { background: #f7c1c1; color: #791f1f; }
@@ -109,6 +110,7 @@ const HTML = `<!DOCTYPE html>
         <div id="th-num" style="font-size:12px; color:#777;"></div>
       </div>
       <div style="display:flex; gap:6px;">
+        <button id="save-btn">Guardar contacto</button>
         <button id="toggle-btn"></button>
         <button id="block-btn"></button>
         <button id="delete-btn" title="Eliminar conversacion">Eliminar</button>
@@ -134,6 +136,7 @@ let CURRENT = null;
 let CURRENT_TAKEOVER = false;
 let CURRENT_BLOCKED = false;
 let TEMPLATES = {};
+let CURRENT_INFO = { name: '', note: '' };
 
 document.getElementById('gate-form').addEventListener('submit', function(e) {
   e.preventDefault();
@@ -210,7 +213,8 @@ function renderSidebar(contacts) {
     const preview = previewText(c.last);
     const badgeClass = c.blocked ? 'blocked' : (c.takeover ? 'human' : 'auto');
     const badgeText = c.blocked ? 'Bloqueado' : (c.takeover ? 'Control humano' : 'Agente activo');
-    div.innerHTML = '<div class="num">' + c.number + '</div>' +
+    div.innerHTML = '<div class="num">' + (c.name ? escapeHtml(c.name) : c.number) + '</div>' +
+      (c.name ? '<div class="prev" style="font-size:11px;">' + c.number + '</div>' : '') +
       '<div class="prev">' + escapeHtml(preview) + '</div>' +
       '<span class="badge ' + badgeClass + '">' + badgeText + '</span>';
     div.addEventListener('click', function() { openThread(c.number); });
@@ -224,8 +228,12 @@ function openThread(number) {
     document.getElementById('empty').style.display = 'none';
     document.getElementById('thread-header').style.display = 'flex';
     document.getElementById('replybar').style.display = 'flex';
-    document.getElementById('th-name').textContent = number;
-    document.getElementById('th-num').textContent = data.takeover ? 'Control humano activo' : 'Respondido por el agente';
+    CURRENT_INFO = { name: data.name || '', note: data.note || '' };
+    document.getElementById('th-name').textContent = CURRENT_INFO.name || number;
+    document.getElementById('th-num').textContent = (CURRENT_INFO.name ? number + ' - ' : '') +
+      (data.takeover ? 'Control humano activo' : 'Respondido por el agente') +
+      (CURRENT_INFO.note ? ' - Nota: ' + CURRENT_INFO.note : '');
+    document.getElementById('save-btn').textContent = CURRENT_INFO.name || CURRENT_INFO.note ? 'Editar contacto' : 'Guardar contacto';
     document.getElementById('takeover-bar').style.display = data.takeover ? 'flex' : 'none';
     CURRENT_TAKEOVER = !!data.takeover;
     const toggleBtn = document.getElementById('toggle-btn');
@@ -274,6 +282,18 @@ document.getElementById('release-btn').addEventListener('click', function() {
   api('/api/takeover', {
     method: 'POST',
     body: JSON.stringify({ to: CURRENT, action: 'release' }),
+  }).then(function() { openThread(CURRENT); });
+});
+
+document.getElementById('save-btn').addEventListener('click', function() {
+  if (!CURRENT) return;
+  var name = prompt('Nombre del contacto (deja vacio junto con la nota para quitarlo de guardados):', CURRENT_INFO.name);
+  if (name === null) return;
+  var note = prompt('Nota opcional (ej. ciudad, hospital, estado del caso):', CURRENT_INFO.note);
+  if (note === null) return;
+  api('/api/threads', {
+    method: 'POST',
+    body: JSON.stringify({ to: CURRENT, name: name, note: note }),
   }).then(function() { openThread(CURRENT); });
 });
 

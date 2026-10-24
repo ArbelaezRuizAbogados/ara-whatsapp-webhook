@@ -42,13 +42,31 @@ async function getTemplates(res) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') {
+  if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).send('Method Not Allowed');
   }
 
   const secret = req.headers['x-poll-secret'] || req.query.secret;
   if (!secret || secret !== process.env.POLL_SECRET) {
     return res.status(401).send('Unauthorized');
+  }
+
+  // POST: guardar / editar / borrar el nombre y la nota de un contacto.
+  // (Va aqui y no en un archivo nuevo por el limite de 12 funciones de Vercel.)
+  if (req.method === 'POST') {
+    const { to, name, note } = req.body || {};
+    if (!to) {
+      return res.status(400).json({ error: 'Falta "to" (numero del contacto).' });
+    }
+    const { kv } = await import('@vercel/kv');
+    const cleanName = String(name || '').trim().slice(0, 80);
+    const cleanNote = String(note || '').trim().slice(0, 300);
+    if (!cleanName && !cleanNote) {
+      await kv.hdel('whatsapp:contactinfo', String(to));
+    } else {
+      await kv.hset('whatsapp:contactinfo', { [String(to)]: { name: cleanName, note: cleanNote } });
+    }
+    return res.status(200).json({ success: true, to: String(to), name: cleanName, note: cleanNote });
   }
 
   if (req.query.templates) {
@@ -58,13 +76,22 @@ export default async function handler(req, res) {
   const { kv } = await import('@vercel/kv');
   const contacts = await kv.zrange('whatsapp:contacts', 0, -1, { rev: true });
 
+  // Contactos guardados (nombre y nota por numero): un solo registro, una sola
+  // lectura por consulta.
+  const saved = (await kv.hgetall('whatsapp:contactinfo')) || {};
+  const infoOf = (n) => {
+    const v = saved[n];
+    const o = typeof v === 'string' ? JSON.parse(v) : v;
+    return { name: (o && o.name) || '', note: (o && o.note) || '' };
+  };
+
   const single = req.query.number;
   if (single) {
     const raw = await kv.lrange(`whatsapp:thread:${single}`, 0, -1);
     const messages = raw.map((m) => (typeof m === 'string' ? JSON.parse(m) : m));
     const takeover = !!(await kv.get(`whatsapp:takeover:${single}`));
     const blocked = !!(await kv.get(`whatsapp:blocked:${single}`));
-    return res.status(200).json({ number: single, takeover, blocked, messages });
+    return res.status(200).json({ number: single, takeover, blocked, ...infoOf(single), messages });
   }
 
   const list = [];
@@ -73,7 +100,7 @@ export default async function handler(req, res) {
     const last = raw[0] ? (typeof raw[0] === 'string' ? JSON.parse(raw[0]) : raw[0]) : null;
     const takeover = !!(await kv.get(`whatsapp:takeover:${number}`));
     const blocked = !!(await kv.get(`whatsapp:blocked:${number}`));
-    list.push({ number, last, takeover, blocked });
+    list.push({ number, last, takeover, blocked, ...infoOf(number) });
   }
 
   res.status(200).json({ contacts: list });
