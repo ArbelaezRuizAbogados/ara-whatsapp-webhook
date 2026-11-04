@@ -64,6 +64,10 @@ export default async function handler(req, res) {
       console.log('Campo:', field, '| mensajes:', messages.length, '| estados:', statuses.length);
 
       for (const msg of messages) {
+        // Meta ya no siempre manda el telefono en 'from': los usuarios con
+        // nombre de usuario llegan solo con from_user_id (BSUID). Se usa como
+        // identificador para que el mensaje igual aparezca en el visor.
+        const sender = msg.from || msg.from_user_id;
         // Media (audio, imagen, video, documento): Meta solo manda un ID de
         // referencia, no el archivo - queda guardado para descargarlo despues
         // via /api/media cuando el visor lo pida.
@@ -83,7 +87,7 @@ export default async function handler(req, res) {
         await kv.rpush('whatsapp:inbox', JSON.stringify({
           kind: 'message',
           id: msg.id,
-          from: msg.from,
+          from: sender,
           timestamp: msg.timestamp,
           type: msg.type,
           text: messageText || null,
@@ -95,7 +99,7 @@ export default async function handler(req, res) {
         }));
 
         // Historial permanente para el visor (no se borra al consumir /api/inbox).
-        await kv.rpush(`whatsapp:thread:${msg.from}`, JSON.stringify({
+        await kv.rpush(`whatsapp:thread:${sender}`, JSON.stringify({
           direction: 'in',
           sender: 'customer',
           text: messageText || `[${msg.type}]`,
@@ -107,7 +111,7 @@ export default async function handler(req, res) {
           timestamp: msg.timestamp,
           received_at: new Date().toISOString(),
         }));
-        await kv.zadd('whatsapp:contacts', { score: Number(msg.timestamp), member: msg.from });
+        await kv.zadd('whatsapp:contacts', { score: Number(msg.timestamp), member: sender });
       }
 
       for (const st of statuses) {
