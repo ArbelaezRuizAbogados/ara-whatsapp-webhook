@@ -253,7 +253,15 @@ function applyFilters() {
     const hay = (c.number + ' ' + (c.name || '') + ' ' + (c.note || '') + ' ' + (c.label || '') + ' ' + previewText(c.last)).toLowerCase();
     return hay.indexOf(q) >= 0;
   });
-  renderSidebar(list);
+  // Orden por rotulo; dentro de cada grupo se conserva el orden por actividad reciente.
+  const rank = { 'Cita programada': 0, 'Pendiente autorizacion': 1, 'Contrato en ejecucion': 2, '': 3, 'Sin respuesta': 4, 'No deseado': 5 };
+  const withIdx = list.map(function(c, i) { return { c: c, i: i }; });
+  withIdx.sort(function(x, y) {
+    const rx = rank[x.c.label || ''] === undefined ? 3 : rank[x.c.label || ''];
+    const ry = rank[y.c.label || ''] === undefined ? 3 : rank[y.c.label || ''];
+    return rx - ry || x.i - y.i;
+  });
+  renderSidebar(withIdx.map(function(o) { return o.c; }));
 }
 
 function runSearch() {
