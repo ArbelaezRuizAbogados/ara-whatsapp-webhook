@@ -109,6 +109,7 @@ const HTML = `<!DOCTYPE html>
       <option>Seguimiento cierre</option>
       <option>Contrato en ejecucion</option>
       <option>No deseado</option>
+      <option>Chat de prueba</option>
     </select>
     <button id="queue-btn">Cola pendiente (0)</button>
   </div>
@@ -138,6 +139,7 @@ const HTML = `<!DOCTYPE html>
           <option>Seguimiento cierre</option>
           <option>Contrato en ejecucion</option>
           <option>No deseado</option>
+          <option>Chat de prueba</option>
         </select>
         <button id="save-btn">Guardar contacto</button>
         <button id="toggle-btn"></button>
@@ -174,7 +176,8 @@ const LABEL_COLORS = {
   'Cita programada': '#2b6cb0',
   'Seguimiento cierre': '#6b46c1',
   'Contrato en ejecucion': '#2f855a',
-  'No deseado': '#c53030'
+  'No deseado': '#c53030',
+  'Chat de prueba': '#0987a0'
 };
 
 document.getElementById('gate-form').addEventListener('submit', function(e) {
@@ -257,7 +260,7 @@ function applyFilters() {
     return hay.indexOf(q) >= 0;
   });
   // Orden por rotulo; dentro de cada grupo se conserva el orden por actividad reciente.
-  const rank = { 'Seguimiento cierre': 0, 'Cita programada': 1, 'Pendiente autorizacion': 2, 'Contrato en ejecucion': 3, '': 4, 'Sin respuesta': 5, 'No deseado': 6 };
+  const rank = { 'Seguimiento cierre': 0, 'Cita programada': 1, 'Pendiente autorizacion': 2, 'Contrato en ejecucion': 3, '': 4, 'Sin respuesta': 5, 'No deseado': 6, 'Chat de prueba': 7 };
   const withIdx = list.map(function(c, i) { return { c: c, i: i }; });
   withIdx.sort(function(x, y) {
     const rx = rank[x.c.label || ''] === undefined ? 4 : rank[x.c.label || ''];
