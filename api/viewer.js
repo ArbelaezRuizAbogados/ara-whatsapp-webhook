@@ -499,7 +499,7 @@ setInterval(function() {
   if (!SECRET) return;
   if (CURRENT) { openThread(CURRENT); } else { loadContacts(); }
   loadQueue();
-}, 15000);
+}, 60000);
 </script>
 </body>
 </html>`;

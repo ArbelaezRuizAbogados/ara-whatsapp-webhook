@@ -53,13 +53,17 @@ export default async function handler(req, res) {
 
     try {
       const { kv } = await import('@vercel/kv');
-      await kv.rpush(`whatsapp:thread:${to}`, JSON.stringify({
+      const entry = {
         direction: 'out',
         sender: who,
         text: message || `[plantilla: ${template}]`,
         timestamp: String(Math.floor(Date.now() / 1000)),
         received_at: new Date().toISOString(),
-      }));
+      };
+      await kv.rpush(`whatsapp:thread:${to}`, JSON.stringify(entry));
+      // Ultimo mensaje por contacto en un solo registro: el visor lista los
+      // contactos con 1 lectura en vez de 1 por contacto (ahorra comandos).
+      await kv.hset('whatsapp:last', { [String(to)]: entry });
       await kv.zadd('whatsapp:contacts', { score: Math.floor(Date.now() / 1000), member: to });
 
       if (who === 'human') {

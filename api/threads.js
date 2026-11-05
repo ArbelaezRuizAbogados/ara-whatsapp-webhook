@@ -123,13 +123,25 @@ export default async function handler(req, res) {
     return res.status(200).json({ number: single, takeover, blocked, ...infoOf(single), messages });
   }
 
+  // Pocas lecturas: ultimo mensaje desde un solo registro (whatsapp:last) y
+  // takeover/bloqueo con un mget cada uno. Los contactos que aun no estan en
+  // el registro se leen una vez y quedan guardados.
+  const lastMap = (await kv.hgetall('whatsapp:last')) || {};
+  const tKeys = contacts.map((n) => `whatsapp:takeover:${n}`);
+  const bKeys = contacts.map((n) => `whatsapp:blocked:${n}`);
+  const tVals = tKeys.length ? await kv.mget(...tKeys) : [];
+  const bVals = bKeys.length ? await kv.mget(...bKeys) : [];
   const list = [];
-  for (const number of contacts) {
-    const raw = await kv.lrange(`whatsapp:thread:${number}`, -1, -1);
-    const last = raw[0] ? (typeof raw[0] === 'string' ? JSON.parse(raw[0]) : raw[0]) : null;
-    const takeover = !!(await kv.get(`whatsapp:takeover:${number}`));
-    const blocked = !!(await kv.get(`whatsapp:blocked:${number}`));
-    list.push({ number, last, takeover, blocked, ...infoOf(number) });
+  for (let i = 0; i < contacts.length; i++) {
+    const number = contacts[i];
+    let last = lastMap[number];
+    if (typeof last === 'string') last = JSON.parse(last);
+    if (!last) {
+      const raw = await kv.lrange(`whatsapp:thread:${number}`, -1, -1);
+      last = raw[0] ? (typeof raw[0] === 'string' ? JSON.parse(raw[0]) : raw[0]) : null;
+      if (last) await kv.hset('whatsapp:last', { [String(number)]: last });
+    }
+    list.push({ number, last: last || null, takeover: !!tVals[i], blocked: !!bVals[i], ...infoOf(number) });
   }
 
   res.status(200).json({ contacts: list });

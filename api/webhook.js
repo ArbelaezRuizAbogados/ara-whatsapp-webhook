@@ -99,7 +99,7 @@ export default async function handler(req, res) {
         }));
 
         // Historial permanente para el visor (no se borra al consumir /api/inbox).
-        await kv.rpush(`whatsapp:thread:${sender}`, JSON.stringify({
+        const threadEntry = {
           direction: 'in',
           sender: 'customer',
           text: messageText || `[${msg.type}]`,
@@ -110,7 +110,9 @@ export default async function handler(req, res) {
           media_type: media ? msg.type : null,
           timestamp: msg.timestamp,
           received_at: new Date().toISOString(),
-        }));
+        };
+        await kv.rpush(`whatsapp:thread:${sender}`, JSON.stringify(threadEntry));
+        await kv.hset('whatsapp:last', { [String(sender)]: threadEntry });
         await kv.zadd('whatsapp:contacts', { score: Number(msg.timestamp), member: sender });
       }
 

@@ -16,6 +16,7 @@ export default async function handler(req, res) {
   const { kv } = await import('@vercel/kv');
   await kv.del(`whatsapp:thread:${to}`);
   await kv.zrem('whatsapp:contacts', to);
+  await kv.hdel('whatsapp:last', String(to));
   await kv.del(`whatsapp:takeover:${to}`);
 
   res.status(200).json({ success: true, deleted: to });
