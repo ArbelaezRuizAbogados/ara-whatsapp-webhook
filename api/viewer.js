@@ -106,6 +106,7 @@ const HTML = `<!DOCTYPE html>
       <option>Pendiente autorizacion</option>
       <option>Sin respuesta</option>
       <option>Cita programada</option>
+      <option>Seguimiento cierre</option>
       <option>Contrato en ejecucion</option>
       <option>No deseado</option>
     </select>
@@ -134,6 +135,7 @@ const HTML = `<!DOCTYPE html>
           <option>Pendiente autorizacion</option>
           <option>Sin respuesta</option>
           <option>Cita programada</option>
+          <option>Seguimiento cierre</option>
           <option>Contrato en ejecucion</option>
           <option>No deseado</option>
         </select>
@@ -170,6 +172,7 @@ const LABEL_COLORS = {
   'Pendiente autorizacion': '#b7791f',
   'Sin respuesta': '#718096',
   'Cita programada': '#2b6cb0',
+  'Seguimiento cierre': '#6b46c1',
   'Contrato en ejecucion': '#2f855a',
   'No deseado': '#c53030'
 };
@@ -254,11 +257,11 @@ function applyFilters() {
     return hay.indexOf(q) >= 0;
   });
   // Orden por rotulo; dentro de cada grupo se conserva el orden por actividad reciente.
-  const rank = { 'Cita programada': 0, 'Pendiente autorizacion': 1, 'Contrato en ejecucion': 2, '': 3, 'Sin respuesta': 4, 'No deseado': 5 };
+  const rank = { 'Cita programada': 0, 'Pendiente autorizacion': 1, 'Seguimiento cierre': 2, 'Contrato en ejecucion': 3, '': 4, 'Sin respuesta': 5, 'No deseado': 6 };
   const withIdx = list.map(function(c, i) { return { c: c, i: i }; });
   withIdx.sort(function(x, y) {
-    const rx = rank[x.c.label || ''] === undefined ? 3 : rank[x.c.label || ''];
-    const ry = rank[y.c.label || ''] === undefined ? 3 : rank[y.c.label || ''];
+    const rx = rank[x.c.label || ''] === undefined ? 4 : rank[x.c.label || ''];
+    const ry = rank[y.c.label || ''] === undefined ? 4 : rank[y.c.label || ''];
     return rx - ry || x.i - y.i;
   });
   renderSidebar(withIdx.map(function(o) { return o.c; }));
