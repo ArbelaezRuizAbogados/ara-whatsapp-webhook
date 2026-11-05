@@ -51,22 +51,51 @@ export default async function handler(req, res) {
     return res.status(401).send('Unauthorized');
   }
 
-  // POST: guardar / editar / borrar el nombre y la nota de un contacto.
-  // (Va aqui y no en un archivo nuevo por el limite de 12 funciones de Vercel.)
+  // POST: guardar / editar / borrar el nombre, la nota y el rotulo de un contacto.
+  // Los campos que no vienen en el cuerpo se conservan (asi se puede cambiar
+  // solo el rotulo sin tocar el nombre). Va aqui y no en un archivo nuevo por
+  // el limite de 12 funciones de Vercel.
   if (req.method === 'POST') {
-    const { to, name, note } = req.body || {};
+    const { to, name, note, label } = req.body || {};
     if (!to) {
       return res.status(400).json({ error: 'Falta "to" (numero del contacto).' });
     }
     const { kv } = await import('@vercel/kv');
-    const cleanName = String(name || '').trim().slice(0, 80);
-    const cleanNote = String(note || '').trim().slice(0, 300);
-    if (!cleanName && !cleanNote) {
+    const prevRaw = await kv.hget('whatsapp:contactinfo', String(to));
+    const prev = (typeof prevRaw === 'string' ? JSON.parse(prevRaw) : prevRaw) || {};
+    const cleanName = name === undefined ? (prev.name || '') : String(name || '').trim().slice(0, 80);
+    const cleanNote = note === undefined ? (prev.note || '') : String(note || '').trim().slice(0, 300);
+    const cleanLabel = label === undefined ? (prev.label || '') : String(label || '').trim().slice(0, 40);
+    if (!cleanName && !cleanNote && !cleanLabel) {
       await kv.hdel('whatsapp:contactinfo', String(to));
     } else {
-      await kv.hset('whatsapp:contactinfo', { [String(to)]: { name: cleanName, note: cleanNote } });
+      await kv.hset('whatsapp:contactinfo', { [String(to)]: { name: cleanName, note: cleanNote, label: cleanLabel } });
     }
-    return res.status(200).json({ success: true, to: String(to), name: cleanName, note: cleanNote });
+    return res.status(200).json({ success: true, to: String(to), name: cleanName, note: cleanNote, label: cleanLabel });
+  }
+
+  // Busqueda de texto dentro de todas las conversaciones (?search=palabra).
+  if (req.query.search) {
+    const q = String(req.query.search).toLowerCase().trim();
+    const { kv } = await import('@vercel/kv');
+    const nums = await kv.zrange('whatsapp:contacts', 0, -1, { rev: true });
+    const hits = [];
+    for (const number of nums) {
+      const raw = await kv.lrange(`whatsapp:thread:${number}`, 0, -1);
+      let found = null;
+      for (const m of raw) {
+        const o = typeof m === 'string' ? JSON.parse(m) : m;
+        const text = String((o && (o.text || o.button)) || '');
+        const at = text.toLowerCase().indexOf(q);
+        if (at >= 0) {
+          const from = Math.max(0, at - 25);
+          found = (from > 0 ? '...' : '') + text.slice(from, at + q.length + 45);
+          break;
+        }
+      }
+      if (found) hits.push({ number, snippet: found });
+    }
+    return res.status(200).json({ hits });
   }
 
   if (req.query.templates) {
@@ -82,7 +111,7 @@ export default async function handler(req, res) {
   const infoOf = (n) => {
     const v = saved[n];
     const o = typeof v === 'string' ? JSON.parse(v) : v;
-    return { name: (o && o.name) || '', note: (o && o.note) || '' };
+    return { name: (o && o.name) || '', note: (o && o.note) || '', label: (o && o.label) || '' };
   };
 
   const single = req.query.number;

@@ -17,7 +17,13 @@ const HTML = `<!DOCTYPE html>
   #gate input { width: 100%; padding: 10px; margin: 12px 0; border: 1px solid #ccc; border-radius: 4px; }
   #gate button, .send-btn { background: #1b2a4a; color: #fff; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; width: 100%; }
   #app { display: none; height: 100vh; flex-direction: column; }
-  #top-bar { background: #1b2a4a; color: #fff; padding: 8px 14px; display: flex; justify-content: flex-end; flex-shrink: 0; }
+  #top-bar { background: #1b2a4a; color: #fff; padding: 8px 14px; display: flex; justify-content: flex-end; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
+  #search-input { flex: 1; min-width: 140px; max-width: 360px; padding: 6px 10px; border-radius: 4px; border: none; font-size: 13px; }
+  #search-btn, #label-filter { padding: 6px 10px; border-radius: 4px; border: none; font-size: 12.5px; cursor: pointer; }
+  #label-sel { border-radius: 4px; padding: 6px 8px; font-size: 12.5px; border: 1px solid #1b2a4a; background: #fff; }
+  .lbl { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 10px; margin: 4px 4px 0 0; color: #fff; }
+  .snip { font-size: 11px; color: #8a6d00; background: #fff6d6; padding: 2px 5px; border-radius: 3px; margin-top: 3px; white-space: normal; word-break: break-word; }
+  @media (max-width: 700px) { #label-sel { max-width: 110px; font-size: 10.5px; } .snip { display: none; } }
   #queue-btn { background: none; border: 1px solid rgba(255,255,255,0.5); color: #fff; border-radius: 4px; padding: 5px 10px; cursor: pointer; font-size: 12px; }
   #main-row { flex: 1; display: flex; min-height: 0; }
   #queue-panel { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 10; align-items: center; justify-content: center; }
@@ -92,6 +98,17 @@ const HTML = `<!DOCTYPE html>
 
 <div id="app" style="display:none;">
   <div id="top-bar">
+    <input type="text" id="search-input" placeholder="Buscar numero, nombre o palabra en los chats..." />
+    <button id="search-btn">Buscar en chats</button>
+    <select id="label-filter">
+      <option value="">Todos los rotulos</option>
+      <option value="__none">Sin rotulo</option>
+      <option>Pendiente autorizacion</option>
+      <option>Sin respuesta</option>
+      <option>Cita programada</option>
+      <option>Contrato en ejecucion</option>
+      <option>No deseado</option>
+    </select>
     <button id="queue-btn">Cola pendiente (0)</button>
   </div>
   <div id="queue-panel">
@@ -112,6 +129,14 @@ const HTML = `<!DOCTYPE html>
         <div id="th-num" style="font-size:12px; color:#777;"></div>
       </div>
       <div style="display:flex; gap:6px;">
+        <select id="label-sel" title="Rotulo del contacto">
+          <option value="">Sin rotulo</option>
+          <option>Pendiente autorizacion</option>
+          <option>Sin respuesta</option>
+          <option>Cita programada</option>
+          <option>Contrato en ejecucion</option>
+          <option>No deseado</option>
+        </select>
         <button id="save-btn">Guardar contacto</button>
         <button id="toggle-btn"></button>
         <button id="block-btn"></button>
@@ -138,7 +163,16 @@ let CURRENT = null;
 let CURRENT_TAKEOVER = false;
 let CURRENT_BLOCKED = false;
 let TEMPLATES = {};
-let CURRENT_INFO = { name: '', note: '' };
+let CURRENT_INFO = { name: '', note: '', label: '' };
+let ALL_CONTACTS = [];
+let HITS = null;
+const LABEL_COLORS = {
+  'Pendiente autorizacion': '#b7791f',
+  'Sin respuesta': '#718096',
+  'Cita programada': '#2b6cb0',
+  'Contrato en ejecucion': '#2f855a',
+  'No deseado': '#c53030'
+};
 
 document.getElementById('gate-form').addEventListener('submit', function(e) {
   e.preventDefault();
@@ -165,7 +199,8 @@ function loadContacts() {
   return api('/api/threads').then(function(r) {
     if (!r.ok) return false;
     return r.json().then(function(data) {
-      renderSidebar(data.contacts || []);
+      ALL_CONTACTS = data.contacts || [];
+      applyFilters();
       return true;
     });
   }).catch(function() { return false; });
@@ -206,6 +241,40 @@ document.getElementById('queue-close').addEventListener('click', function() {
   document.getElementById('queue-panel').style.display = 'none';
 });
 
+function applyFilters() {
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  const lf = document.getElementById('label-filter').value;
+  const useHits = HITS && HITS.q === q;
+  const list = ALL_CONTACTS.filter(function(c) {
+    if (lf === '__none' && c.label) return false;
+    if (lf && lf !== '__none' && c.label !== lf) return false;
+    if (!q) return true;
+    if (useHits && HITS.map[c.number]) return true;
+    const hay = (c.number + ' ' + (c.name || '') + ' ' + (c.note || '') + ' ' + (c.label || '') + ' ' + previewText(c.last)).toLowerCase();
+    return hay.indexOf(q) >= 0;
+  });
+  renderSidebar(list);
+}
+
+function runSearch() {
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  if (!q) { HITS = null; applyFilters(); return; }
+  const btn = document.getElementById('search-btn');
+  btn.textContent = 'Buscando...';
+  api('/api/threads?search=' + encodeURIComponent(q)).then(function(r) { return r.json(); }).then(function(data) {
+    const map = {};
+    (data.hits || []).forEach(function(h) { map[h.number] = h.snippet; });
+    HITS = { q: q, map: map };
+    btn.textContent = 'Buscar en chats';
+    applyFilters();
+  }).catch(function() { btn.textContent = 'Buscar en chats'; });
+}
+
+document.getElementById('search-input').addEventListener('input', function() { applyFilters(); });
+document.getElementById('search-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') runSearch(); });
+document.getElementById('search-btn').addEventListener('click', runSearch);
+document.getElementById('label-filter').addEventListener('change', applyFilters);
+
 function renderSidebar(contacts) {
   const el = document.getElementById('sidebar');
   el.innerHTML = '';
@@ -221,6 +290,8 @@ function renderSidebar(contacts) {
       '<div class="num">' + (c.name ? escapeHtml(c.name) : c.number) + '</div>' +
       (c.name ? '<div class="prev" style="font-size:11px;">' + c.number + '</div>' : '') +
       '<div class="prev">' + escapeHtml(preview) + '</div>' +
+      (HITS && HITS.map[c.number] && HITS.q === document.getElementById('search-input').value.trim().toLowerCase() ? '<div class="snip">' + escapeHtml(HITS.map[c.number]) + '</div>' : '') +
+      (c.label ? '<span class="lbl" style="background:' + (LABEL_COLORS[c.label] || '#555') + '">' + escapeHtml(c.label) + '</span>' : '') +
       '<span class="badge ' + badgeClass + '">' + badgeText + '</span>';
     div.addEventListener('click', function() { openThread(c.number); });
     el.appendChild(div);
@@ -233,7 +304,8 @@ function openThread(number) {
     document.getElementById('empty').style.display = 'none';
     document.getElementById('thread-header').style.display = 'flex';
     document.getElementById('replybar').style.display = 'flex';
-    CURRENT_INFO = { name: data.name || '', note: data.note || '' };
+    CURRENT_INFO = { name: data.name || '', note: data.note || '', label: data.label || '' };
+    document.getElementById('label-sel').value = CURRENT_INFO.label;
     document.getElementById('th-name').textContent = CURRENT_INFO.name || number;
     document.getElementById('th-num').textContent = (CURRENT_INFO.name ? number + ' - ' : '') +
       (data.takeover ? 'Control humano activo' : 'Respondido por el agente') +
@@ -288,6 +360,16 @@ document.getElementById('release-btn').addEventListener('click', function() {
     method: 'POST',
     body: JSON.stringify({ to: CURRENT, action: 'release' }),
   }).then(function() { openThread(CURRENT); });
+});
+
+document.getElementById('label-sel').addEventListener('change', function() {
+  if (!CURRENT) return;
+  const label = this.value;
+  CURRENT_INFO.label = label;
+  api('/api/threads', {
+    method: 'POST',
+    body: JSON.stringify({ to: CURRENT, label: label }),
+  }).then(loadContacts);
 });
 
 document.getElementById('save-btn').addEventListener('click', function() {
