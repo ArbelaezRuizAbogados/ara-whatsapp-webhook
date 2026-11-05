@@ -257,7 +257,7 @@ function applyFilters() {
     return hay.indexOf(q) >= 0;
   });
   // Orden por rotulo; dentro de cada grupo se conserva el orden por actividad reciente.
-  const rank = { 'Cita programada': 0, 'Pendiente autorizacion': 1, 'Seguimiento cierre': 2, 'Contrato en ejecucion': 3, '': 4, 'Sin respuesta': 5, 'No deseado': 6 };
+  const rank = { 'Seguimiento cierre': 0, 'Cita programada': 1, 'Pendiente autorizacion': 2, 'Contrato en ejecucion': 3, '': 4, 'Sin respuesta': 5, 'No deseado': 6 };
   const withIdx = list.map(function(c, i) { return { c: c, i: i }; });
   withIdx.sort(function(x, y) {
     const rx = rank[x.c.label || ''] === undefined ? 4 : rank[x.c.label || ''];
