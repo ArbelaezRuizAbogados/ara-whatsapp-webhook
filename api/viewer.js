@@ -104,6 +104,7 @@ const HTML = `<!DOCTYPE html>
       <option value="">Todos los rotulos</option>
       <option value="__none">Sin rotulo</option>
       <option>Pendiente autorizacion</option>
+      <option>Sin respuesta reciente</option>
       <option>Sin respuesta</option>
       <option>Cita programada</option>
       <option>Seguimiento cierre</option>
@@ -134,6 +135,7 @@ const HTML = `<!DOCTYPE html>
         <select id="label-sel" title="Rotulo del contacto">
           <option value="">Sin rotulo</option>
           <option>Pendiente autorizacion</option>
+          <option>Sin respuesta reciente</option>
           <option>Sin respuesta</option>
           <option>Cita programada</option>
           <option>Seguimiento cierre</option>
@@ -172,6 +174,7 @@ let ALL_CONTACTS = [];
 let HITS = null;
 const LABEL_COLORS = {
   'Pendiente autorizacion': '#b7791f',
+  'Sin respuesta reciente': '#d69e2e',
   'Sin respuesta': '#718096',
   'Cita programada': '#2b6cb0',
   'Seguimiento cierre': '#6b46c1',
@@ -260,11 +263,11 @@ function applyFilters() {
     return hay.indexOf(q) >= 0;
   });
   // Orden por rotulo; dentro de cada grupo se conserva el orden por actividad reciente.
-  const rank = { 'Seguimiento cierre': 0, 'Cita programada': 1, 'Pendiente autorizacion': 2, 'Contrato en ejecucion': 3, '': 4, 'Sin respuesta': 5, 'No deseado': 6, 'Chat de prueba': 7 };
+  const rank = { 'Seguimiento cierre': 0, 'Cita programada': 1, 'Pendiente autorizacion': 2, 'Contrato en ejecucion': 3, 'Sin respuesta reciente': 4, '': 5, 'Sin respuesta': 6, 'No deseado': 7, 'Chat de prueba': 8 };
   const withIdx = list.map(function(c, i) { return { c: c, i: i }; });
   withIdx.sort(function(x, y) {
-    const rx = rank[x.c.label || ''] === undefined ? 4 : rank[x.c.label || ''];
-    const ry = rank[y.c.label || ''] === undefined ? 4 : rank[y.c.label || ''];
+    const rx = rank[x.c.label || ''] === undefined ? 5 : rank[x.c.label || ''];
+    const ry = rank[y.c.label || ''] === undefined ? 5 : rank[y.c.label || ''];
     return rx - ry || x.i - y.i;
   });
   renderSidebar(withIdx.map(function(o) { return o.c; }));
