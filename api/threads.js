@@ -87,6 +87,18 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: String(err) });
       }
     }
+    // Borrar una plantilla por nombre (solo con el secreto de administracion).
+    if (req.body && req.body.deleteTemplate) {
+      try {
+        const r = await fetch(
+          `https://graph.facebook.com/v21.0/${WABA_ID}/message_templates?name=${encodeURIComponent(req.body.deleteTemplate)}`,
+          { method: 'DELETE', headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } }
+        );
+        return res.status(r.ok ? 200 : r.status).json(await r.json());
+      } catch (err) {
+        return res.status(500).json({ error: String(err) });
+      }
+    }
     if (req.body && req.body.newTemplate) {
       try {
         const t = req.body.newTemplate;
