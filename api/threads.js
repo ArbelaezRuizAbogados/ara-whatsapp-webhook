@@ -56,6 +56,25 @@ export default async function handler(req, res) {
   // solo el rotulo sin tocar el nombre). Va aqui y no en un archivo nuevo por
   // el limite de 12 funciones de Vercel.
   if (req.method === 'POST') {
+    // Crear una plantilla nueva y enviarla a revision de Meta (mismo limite de
+    // 12 funciones: se reutiliza este endpoint).
+    if (req.body && req.body.newTemplate) {
+      try {
+        const t = req.body.newTemplate;
+        const r = await fetch(`https://graph.facebook.com/v21.0/${WABA_ID}/message_templates`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(t),
+        });
+        const data = await r.json();
+        return res.status(r.ok ? 200 : r.status).json(data);
+      } catch (err) {
+        return res.status(500).json({ error: String(err) });
+      }
+    }
     const { to, name, note, label } = req.body || {};
     if (!to) {
       return res.status(400).json({ error: 'Falta "to" (numero del contacto).' });
