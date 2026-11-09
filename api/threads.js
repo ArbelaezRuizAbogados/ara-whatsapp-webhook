@@ -58,6 +58,34 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     // Crear una plantilla nueva y enviarla a revision de Meta (mismo limite de
     // 12 funciones: se reutiliza este endpoint).
+    // Subir un archivo de ejemplo (PDF/imagen) a Meta y devolver el handle que
+    // exigen las plantillas con encabezado de documento o imagen.
+    if (req.body && req.body.uploadSample) {
+      try {
+        const tok = process.env.WHATSAPP_ACCESS_TOKEN;
+        const { url, type, name } = req.body.uploadSample;
+        const file = await fetch(url);
+        const buf = Buffer.from(await file.arrayBuffer());
+        const dbg = await (await fetch(
+          `https://graph.facebook.com/v21.0/debug_token?input_token=${tok}&access_token=${tok}`
+        )).json();
+        const appId = dbg && dbg.data && dbg.data.app_id;
+        if (!appId) return res.status(502).json({ error: 'No se pudo obtener el app_id', detail: dbg });
+        const sess = await (await fetch(
+          `https://graph.facebook.com/v21.0/${appId}/uploads?file_length=${buf.length}&file_type=${encodeURIComponent(type || 'application/pdf')}&file_name=${encodeURIComponent(name || 'archivo')}`,
+          { method: 'POST', headers: { Authorization: `Bearer ${tok}` } }
+        )).json();
+        if (!sess.id) return res.status(502).json({ error: 'No se pudo abrir la sesion de carga', detail: sess });
+        const up = await (await fetch(`https://graph.facebook.com/v21.0/${sess.id}`, {
+          method: 'POST',
+          headers: { Authorization: `OAuth ${tok}`, file_offset: '0' },
+          body: buf,
+        })).json();
+        return res.status(up.h ? 200 : 502).json(up);
+      } catch (err) {
+        return res.status(500).json({ error: String(err) });
+      }
+    }
     if (req.body && req.body.newTemplate) {
       try {
         const t = req.body.newTemplate;
