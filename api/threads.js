@@ -7,7 +7,7 @@ const WABA_ID = '4533782176902793';
 async function getTemplates(res) {
   try {
     const r = await fetch(
-      `https://graph.facebook.com/v21.0/${WABA_ID}/message_templates?fields=name,status,components&limit=100`,
+      `https://graph.facebook.com/v21.0/${WABA_ID}/message_templates?fields=name,status,category,components&limit=100`,
       { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } }
     );
     const data = await r.json();
@@ -31,6 +31,7 @@ async function getTemplates(res) {
         text: parts.join('\n\n'),
         buttons: ((buttons && buttons.buttons) || []).map((b) => b.text),
         status: t.status,
+        category: t.category,
       };
     }
     res.setHeader('Cache-Control', 'private, max-age=300');
